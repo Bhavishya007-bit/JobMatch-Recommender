@@ -1,0 +1,8 @@
+{
+  "source": "ConorsCode/open-jobs-data",
+  "sourceRepository": "https://github.com/ConorsCode/open-jobs-data",
+  "sourceFile": "data/new-jobs.json",
+  "sourceCommit": "83277ee20ab587281e206b22dae2e56f3d65d101",
+  "downloadedAt": "2026-11-22",
+  "note": "Real public job-listing metadata from employer ATS feeds; not generated. 'new-jobs.json' is a one-day incremental snapshot, not all active jobs. Records can expire."
+}
