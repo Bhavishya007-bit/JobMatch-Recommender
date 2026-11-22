@@ -30,7 +30,9 @@ pytest -q
 uvicorn app:app --reload
 ```
 
-Interactive docs: http://127.0.0.1:8000/docs
+Website: http://127.0.0.1:8000/ — search by role, choose a preferred location, filter remote jobs or internships, and open employer application links. No Node.js or separate frontend server is required.
+
+Interactive API docs: http://127.0.0.1:8000/docs
 
 Example query:
 

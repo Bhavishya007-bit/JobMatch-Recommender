@@ -2,6 +2,8 @@
 from contextlib import asynccontextmanager
 import os
 import secrets
+from pathlib import Path
+from fastapi.responses import FileResponse
 from fastapi import FastAPI, HTTPException, Query, Header
 from pydantic import BaseModel, Field, field_validator
 
@@ -81,3 +83,8 @@ def refresh(x_refresh_token: str | None = Header(default=None)):
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Refresh failed: {type(exc).__name__}") from exc
     return {"ingested": changed, "total_jobs": len(engine.jobs), "source": "ConorsCode/open-jobs-data"}
+
+
+@app.get("/", include_in_schema=False)
+def homepage():
+    return FileResponse(Path(__file__).resolve().parent / "web" / "index.html")

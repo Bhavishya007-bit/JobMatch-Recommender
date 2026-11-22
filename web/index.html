@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#153e35">
+<title>JobMatch · Find your next opportunity</title>
+<style>
+:root{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#17382f;background:#f4f7f3;font-synthesis:none}
+*{box-sizing:border-box}body{margin:0}header,main,footer{max-width:1120px;margin:auto;padding:24px}header{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #dce5dc}.brand{font-size:23px;font-weight:800;letter-spacing:-1px}.brand span{color:#42846d}header small{color:#587166}a{color:#22634e}h1{font-size:clamp(36px,6vw,64px);line-height:1.08;letter-spacing:-2px;max-width:760px;margin:24px 0 18px}p{line-height:1.6}.intro{color:#587166;max-width:640px}.eyebrow{font-size:12px;text-transform:uppercase;letter-spacing:2px;font-weight:700;margin-top:30px}.search-panel{background:white;border:1px solid #dce5dc;border-radius:20px;padding:26px;margin:30px 0;box-shadow:0 10px 35px #17382f08}.fields{display:grid;grid-template-columns:2fr 1.2fr auto;gap:16px;align-items:end}label{display:block;font-size:14px;font-weight:650}input,select,button{font:inherit}input[type=text],select{width:100%;border:1px solid #bdcec3;border-radius:9px;padding:13px;background:#fff;color:#17382f;margin-top:8px}button,.apply{background:#215d49;color:white;border:0;border-radius:9px;padding:14px 22px;font-weight:650;cursor:pointer;text-decoration:none;display:inline-block}button:hover,.apply:hover{background:#164332}button:disabled{opacity:.65;cursor:wait}:focus-visible{outline:3px solid #c38424;outline-offset:3px}.options{display:flex;flex-wrap:wrap;align-items:center;gap:22px;margin-top:20px}.options label{display:flex;align-items:center;gap:8px;font-weight:500}.options select{width:auto;margin:0;padding:8px}.options input{accent-color:#215d49;width:17px;height:17px}.hint{font-size:12px;color:#667a70;margin-bottom:0}.examples{display:flex;gap:8px;flex-wrap:wrap;margin-top:20px}.examples button{background:#edf4ee;color:#285c47;font-size:12px;padding:8px 12px}.results-head{display:flex;align-items:center;justify-content:space-between;gap:14px}h2{font-size:22px}#status{color:#587166;font-size:14px}#results{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}.card{background:#fff;border:1px solid #dce5dc;border-radius:16px;padding:24px;display:flex;flex-direction:column;min-width:0}.company{text-transform:uppercase;letter-spacing:1.3px;color:#577366;font-size:12px;font-weight:750}.card h3{font-size:21px;line-height:1.35;margin:10px 0;overflow-wrap:anywhere}.meta{color:#61756b;font-size:14px;margin:5px 0;overflow-wrap:anywhere}.badges{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}.badge{font-size:12px;background:#edf4ee;color:#285c47;padding:6px 9px;border-radius:6px}.card .apply{align-self:flex-start;margin-top:auto;font-size:14px}.card details{font-size:12px;color:#587166;margin:0 0 20px}.card summary{cursor:pointer}.empty{grid-column:1/-1;padding:40px;text-align:center;border:1px dashed #bccfc0;border-radius:16px;color:#587166}.error{color:#a02c25!important}footer{font-size:12px;color:#667a70;margin-top:30px;border-top:1px solid #dce5dc}
+@media(max-width:700px){header,main,footer{padding:20px}.fields{grid-template-columns:1fr}.search-panel{padding:20px}#results{grid-template-columns:1fr}.results-head{align-items:flex-start;flex-direction:column;gap:0}header small{max-width:140px;text-align:right}h1{letter-spacing:-1px}.options{gap:16px}}
+</style>
+</head>
+<body>
+<header><div class="brand">Job<span>Match</span><span aria-hidden="true"> ↗</span></div><small>Real listings. A focused search.</small></header>
+<main>
+<p class="eyebrow">Your next chapter starts here</p>
+<h1>Find work that fits<br>your direction.</h1>
+<p class="intro">Tell us what you want to do. Explore ranked job listings, narrow your search, and go straight to the original application.</p>
+<form id="search-form" class="search-panel">
+<div class="fields">
+<label for="query">What are you looking for?<input id="query" name="query" type="text" placeholder="e.g. Python software engineer" minlength="2" maxlength="2000" required></label>
+<label for="location">Preferred location<input id="location" name="location" type="text" placeholder="e.g. Bengaluru" maxlength="200"></label>
+<button id="submit" type="submit">Find matches ↗</button>
+</div>
+<div class="options">
+<label><input type="checkbox" id="remote">Remote only</label>
+<label><input type="checkbox" id="internship">Internships only</label>
+<label for="limit">Show <select id="limit"><option value="10">10 results</option><option value="20">20 results</option><option value="50">50 results</option></select></label>
+</div>
+<p class="hint">Location is a ranking preference, not a strict filter. Remote only includes listings explicitly marked remote.</p>
+<div class="examples" aria-label="Example searches"><button type="button" data-query="Python software engineer">Python engineering</button><button type="button" data-query="Data analyst">Data analysis</button><button type="button" data-query="Machine learning">Machine learning</button></div>
+</form>
+<div class="results-head"><h2 id="results-title">Explore your next opportunity</h2><p id="status" role="status" aria-live="polite"></p></div>
+<div id="results" aria-busy="false"><div class="empty">Enter a role or area of interest above to find matches.</div></div>
+<noscript><p>This search needs JavaScript. Enable it in your browser to use JobMatch.</p></noscript>
+</main>
+<footer>JobMatch is a portfolio prototype using a saved snapshot of real employer listings. Openings may have expired; confirm availability on the employer’s site. Rankings use available titles, departments and companies, not full job descriptions.</footer>
+<script>
+const form=document.querySelector('#search-form'), results=document.querySelector('#results'), status=document.querySelector('#status'), submit=document.querySelector('#submit');
+function element(tag,text,className){const node=document.createElement(tag);if(text!==undefined)node.textContent=text;if(className)node.className=className;return node;}
+function safeUrl(value){try{const url=new URL(value);return ['https:','http:'].includes(url.protocol)?url.href:null;}catch{return null;}}
+function renderJob(job){
+ const card=element('article',undefined,'card');
+ card.append(element('div',job.company||'Company not provided','company'),element('h3',job.title||'Untitled role'));
+ card.append(element('p',(job.locations||[]).join(' · ')||'Location not provided','meta'));
+ if(job.department)card.append(element('p',job.department,'meta'));
+ const badges=element('div',undefined,'badges');
+ if(job.is_remote===true)badges.append(element('span','Remote','badge'));
+ if(job.employment_type)badges.append(element('span',job.employment_type,'badge'));
+ if(job.signals?.location_match)badges.append(element('span','Preferred location','badge'));
+ card.append(badges);
+ const details=element('details');details.append(element('summary','About this match'));
+ details.append(element('p','Ranked using title, department and company similarity, plus location or remote preferences. A ranking score is not a probability of getting hired.'));
+ if(job.platform)details.append(element('p','Source: '+job.platform));
+ if(job.scraped_at){const date=new Date(job.scraped_at);if(!Number.isNaN(date.getTime()))details.append(element('p','Snapshot date: '+date.toLocaleDateString()));}
+ card.append(details);
+ const url=safeUrl(job.apply_url);
+ if(url){const link=element('a','View & apply ↗','apply');link.href=url;link.target='_blank';link.rel='noopener noreferrer';link.setAttribute('aria-label','View and apply for '+job.title+' at '+job.company+' (opens in a new tab)');card.append(link);}
+ else card.append(element('p','Application link unavailable','meta'));
+ return card;
+}
+form.addEventListener('submit',async event=>{
+ event.preventDefault();
+ const query=document.querySelector('#query').value.trim();
+ if(query.length<2){status.textContent='Enter at least two characters for your search.';status.className='error';return;}
+ submit.disabled=true;submit.textContent='Searching…';status.className='';status.textContent='Finding matches…';results.setAttribute('aria-busy','true');results.replaceChildren();
+ const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),30000);
+ try{
+  const response=await fetch('/recommend?k='+document.querySelector('#limit').value,{method:'POST',headers:{'Content-Type':'application/json'},signal:controller.signal,body:JSON.stringify({query,location:document.querySelector('#location').value.trim(),remote_only:document.querySelector('#remote').checked,remote_ok:true,internship_only:document.querySelector('#internship').checked})});
+  if(!response.ok)throw new Error('Search could not be completed. Please try again.');
+  const data=await response.json();if(!Array.isArray(data.recommendations))throw new Error('Unexpected response. Please try again.');
+  document.querySelector('#results-title').textContent='Your matches';
+  status.textContent=data.recommendations.length+' results · ranked by relevance';
+  if(!data.recommendations.length)results.append(element('div','No listings match these filters. Try another role or turn off a filter.','empty'));
+  else results.append(...data.recommendations.map(renderJob));
+ }catch(error){status.className='error';status.textContent=error.name==='AbortError'?'The search took too long. Please try again.':'Unable to search. Check that the local server is running, then try again.';results.append(element('div','Your search settings are saved above. You can try again.','empty'));}
+ finally{clearTimeout(timer);submit.disabled=false;submit.textContent='Find matches ↗';results.setAttribute('aria-busy','false');}
+});
+document.querySelectorAll('[data-query]').forEach(button=>button.addEventListener('click',()=>{document.querySelector('#query').value=button.dataset.query;form.requestSubmit();}));
+</script>
+</body>
+</html>
