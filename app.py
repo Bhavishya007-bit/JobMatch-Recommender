@@ -1,7 +1,9 @@
 """FastAPI service over real employer ATS job listings."""
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException, Query
-from pydantic import BaseModel, Field
+import os
+import secrets
+from fastapi import FastAPI, HTTPException, Query, Header
+from pydantic import BaseModel, Field, field_validator
 
 from data import load_jobs, refresh_from_web, upsert_jobs
 from recommender import JobRecommender
@@ -24,11 +26,17 @@ app = FastAPI(
 
 
 class Candidate(BaseModel):
-    query: str = Field(min_length=2, description="Search phrase, e.g. 'Python AI engineer internship'")
-    location: str = ""
+    query: str = Field(min_length=2, max_length=2000, description="Search phrase, e.g. 'Python AI engineer internship'")
+    location: str = Field(default="", max_length=200)
     remote_only: bool = False
     remote_ok: bool = True
     internship_only: bool = False
+
+
+    @field_validator("query", "location", mode="before")
+    @classmethod
+    def strip_text(cls, value):
+        return value.strip() if isinstance(value, str) else value
 
 
 def model() -> JobRecommender:
@@ -54,11 +62,18 @@ def recommend(candidate: Candidate, k: int = Query(10, ge=1, le=50)):
 
 
 @app.post("/refresh")
-def refresh():
+def refresh(x_refresh_token: str | None = Header(default=None)):
     """Fetch upstream's daily incremental new jobs; requires network access.
-    Secure this endpoint with authentication before deploying publicly.
+    Disabled unless JOBMATCH_REFRESH_TOKEN is configured; requires matching header.
     """
     global engine
+    configured_token = os.environ.get("JOBMATCH_REFRESH_TOKEN", "")
+    if not configured_token:
+        raise HTTPException(status_code=503, detail="HTTP refresh is disabled")
+    if not x_refresh_token or not secrets.compare_digest(
+        x_refresh_token.encode("utf-8"), configured_token.encode("utf-8")
+    ):
+        raise HTTPException(status_code=401, detail="Invalid refresh token")
     try:
         records = refresh_from_web()
         changed = upsert_jobs(records)
