@@ -56,10 +56,16 @@ The prior synthetic NDCG@10 result is **retired**: it did not measure real-world
 
 - Add actual descriptions from legally accessible sources to support skills and deeper semantics.
 - Create a human-reviewed relevance dataset and run NDCG@10, Recall@10 and MRR@10 against graded labels.
-- Add expiration/removal detection and a scheduled daily ingestion process.
-- Authenticate the `/refresh` endpoint, add request limits, retries and monitoring before any public deployment.
+- Add expiration/removal detection; a daily GitHub Actions snapshot refresh is configured.
+- Add rate limits, refresh concurrency control, retries and monitoring before any public deployment.
 - LSA is *not* a transformer-embedding model, and this prototype does not contain an autonomous LLM agent, durable personalization, or production traffic.
 
 ## License and third-party data
 
 Consult upstream source policies before redistributing a commercial derivative. No rights are claimed to the job listings or company names.
+
+## API reliability
+
+Search queries are trimmed and must contain 2–2,000 characters; location text is limited to 200 characters. Invalid input returns HTTP 422.
+
+HTTP refresh is disabled (503) unless `JOBMATCH_REFRESH_TOKEN` is configured. Callers must provide the same secret in `X-Refresh-Token`; missing or incorrect credentials return 401 before any upstream request. Use HTTPS and keep this server-side token private. The CLI and scheduled snapshot refresh remain independent. A failed refresh returns 502 and preserves the in-memory search index. This is a prototype safeguard, not a complete public-deployment security model.
