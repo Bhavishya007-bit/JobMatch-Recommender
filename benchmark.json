@@ -1,20 +1,12 @@
 {
-  "baseline": {
-    "NDCG@10": 0.8911,
-    "Recall@10": 1.0,
-    "MRR@10": 1.0,
-    "median_ranking_latency_ms": 1.73
-  },
-  "hybrid": {
-    "NDCG@10": 0.9614,
-    "Recall@10": 1.0,
-    "MRR@10": 1.0,
-    "median_ranking_latency_ms": 1.64
-  },
-  "benchmark": {
-    "jobs": 72,
-    "profiles": 18,
-    "data_source": "fully synthetic role postings and synthetic relevance labels",
-    "limitation": "Not a production benchmark or evidence of real-user relevance"
-  }
+  "dataset": "Real employer ATS postings from ConorsCode/open-jobs-data",
+  "snapshot_date": "2026-11-21",
+  "job_count": 1326,
+  "unique_employers": 147,
+  "confirmed_remote": 157,
+  "unknown_remote_status": 1083,
+  "valid_application_links": 1326,
+  "ranking_metrics": null,
+  "ranking_metrics_status": "Not available: independent user-to-job relevance labels are required for real NDCG@10, Recall@10 and MRR@10.",
+  "note": "Run python evaluate.py for current dataset coverage and indexing sanity checks. Historical synthetic NDCG claims do not apply to this dataset."
 }
