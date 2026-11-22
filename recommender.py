@@ -1,103 +1,75 @@
-"""Local LSA-based retrieval and personalized hybrid re-ranking.
-Only standard scientific Python dependencies; runs fully offline.
+"""Real ATS listing retrieval: TF-IDF and LSA, with transparent metadata filters.
+
+Upstream data has no detailed job descriptions, inferred skills, or verified relevance labels.
+Therefore this ranks actual titles/departments/companies only. No fake skills.
 """
-import math
-import sqlite3
-from pathlib import Path
+from __future__ import annotations
 from typing import Any
-import json
 import numpy as np
 from sklearn.decomposition import TruncatedSVD
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
-from data import make_jobs
-
-DB_PATH = Path(__file__).with_name("jobs.sqlite")
-
-
-def init_db(db_path=DB_PATH):
-    """Create a real SQLite table and populate it with synthetic demonstration jobs."""
-    with sqlite3.connect(db_path) as conn:
-        conn.execute("""CREATE TABLE IF NOT EXISTS jobs (
-            id INTEGER PRIMARY KEY,
-            company TEXT NOT NULL,
-            title TEXT NOT NULL,
-            track TEXT NOT NULL,
-            skills_json TEXT NOT NULL,
-            description TEXT NOT NULL,
-            location TEXT NOT NULL,
-            level TEXT NOT NULL
-        )""")
-        if conn.execute("SELECT COUNT(*) FROM jobs").fetchone()[0] == 0:
-            conn.executemany(
-                "INSERT INTO jobs VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                [(r["id"], r["company"], r["title"], r["track"],
-                  json.dumps(r["skills"]), r["description"], r["location"], r["level"])
-                 for r in make_jobs()]
-            )
-            conn.commit()
-
-
-def load_jobs(db_path=DB_PATH):
-    init_db(db_path)
-    with sqlite3.connect(db_path) as conn:
-        conn.row_factory = sqlite3.Row
-        rows = conn.execute("SELECT * FROM jobs ORDER BY id").fetchall()
-    result = []
-    for row in rows:
-        record = dict(row)
-        record["skills"] = json.loads(record.pop("skills_json"))
-        result.append(record)
-    return result
+from data import load_jobs
 
 
 class JobRecommender:
-    def __init__(self, jobs):
-        self.jobs = jobs
-        corpus = [self._job_text(job) for job in jobs]
+    def __init__(self, jobs: list[dict]):
+        self.jobs = list(jobs)
+        if not self.jobs:
+            raise ValueError("No jobs available. Ingest a real snapshot first.")
+        corpus = [self.document(job) for job in self.jobs]
         self.vectorizer = TfidfVectorizer(ngram_range=(1, 2), sublinear_tf=True, stop_words="english")
-        tfidf = self.vectorizer.fit_transform(corpus)
-        dimensions = min(35, tfidf.shape[0] - 1, tfidf.shape[1] - 1)
-        self.reducer = TruncatedSVD(n_components=dimensions, random_state=42)
-        self.job_vectors = self.reducer.fit_transform(tfidf)
-        self.job_tfidf = tfidf
+        self.tfidf = self.vectorizer.fit_transform(corpus)
+        dims = min(60, self.tfidf.shape[0] - 1, self.tfidf.shape[1] - 1)
+        self.reducer = TruncatedSVD(n_components=dims, random_state=42) if dims >= 2 else None
+        self.lsa = self.reducer.fit_transform(self.tfidf) if self.reducer else None
 
     @staticmethod
-    def _job_text(job):
-        return (job["title"] + " " + job["description"] + " "
-                + " ".join(job["skills"]) * 2)
+    def document(job: dict) -> str:
+        # Only information actually provided by upstream; no invented descriptions or requirements.
+        return " ".join([str(job.get("title") or "")] * 3 +
+                        [str(job.get("department") or ""), str(job.get("company") or "")])
 
-    def recommend(self, profile: dict[str, Any], k=10, mode="hybrid"):
-        query = profile["query"] + " " + " ".join(profile.get("skills", []))
-        vector = self.vectorizer.transform([query])
-        # A lexical baseline and a compact, learned dense LSA representation.
-        lexical = cosine_similarity(vector, self.job_tfidf)[0]
-        dense = self.reducer.transform(vector)
-        semantic = cosine_similarity(dense, self.job_vectors)[0]
-        max_semantic = max(float(np.max(semantic)), 1e-8)
-        normalized_semantic = np.maximum(semantic, 0) / max_semantic
-        desired = set(s.lower() for s in profile.get("skills", []))
-        output = []
+    def recommend(self, profile: dict[str, Any], k: int = 10, mode: str = "hybrid") -> list[dict]:
+        if mode not in ("hybrid", "baseline"):
+            raise ValueError("mode must be 'hybrid' or 'baseline'")
+        query = str(profile.get("query") or "").strip()
+        if not query:
+            raise ValueError("query must not be blank")
+        text_vector = self.vectorizer.transform([query])
+        lexical = cosine_similarity(text_vector, self.tfidf)[0]
+        semantic = cosine_similarity(self.reducer.transform(text_vector), self.lsa)[0] if self.reducer else lexical
+        # Using raw cosine similarities; the text feature is LSA, not transformer embeddings.
+        desired_location = str(profile.get("location") or "").casefold().strip()
+        remote_only = bool(profile.get("remote_only", False))
+        remote_ok = bool(profile.get("remote_ok", True))
+        internship_only = bool(profile.get("internship_only", False))
+        filtered = []
         for idx, job in enumerate(self.jobs):
-            job_skills = set(job["skills"])
-            overlap = len(desired & job_skills) / max(len(desired), 1)
-            is_remote = job["location"] == "Remote"
-            loc_match = job["location"] == profile.get("location")
-            loc_score = 1.0 if loc_match or (is_remote and profile.get("remote_ok")) else 0.0
-            level_score = 1.0 if job["level"] == profile.get("level", "Internship") else 0.0
-            score = (float(lexical[idx]) if mode == "baseline" else
-                     0.48 * float(normalized_semantic[idx]) + 0.32 * overlap +
-                     0.12 * loc_score + 0.08 * level_score)
-            output.append({
-                "id": job["id"], "title": job["title"], "company": job["company"],
-                "location": job["location"], "level": job["level"],
-                "skills": job["skills"], "track": job["track"],
-                "score": round(score, 5),
-                "explanation": {
-                    "shared_skills": sorted(desired & job_skills),
-                    "preferred_location": bool(loc_score),
-                    "experience_level_match": bool(level_score),
-                }
+            if remote_only and job["is_remote"] is not True:
+                continue
+            if not remote_ok and job["is_remote"] is True:
+                continue
+            if internship_only and not any(t in job["title"].casefold() for t in ("intern", "internship")):
+                continue
+            locations = " ".join(job["locations"]).casefold()
+            loc_match = bool(desired_location and desired_location in locations)
+            remote_match = bool(remote_ok and job["is_remote"] is True)
+            score = float(lexical[idx]) if mode == "baseline" else (
+                0.65 * float(lexical[idx]) + 0.25 * max(0.0, float(semantic[idx]))
+                + 0.10 * float(loc_match or remote_match)
+            )
+            filtered.append({
+                "job_key": job["job_key"],
+                "title": job["title"], "company": job["company"], "department": job["department"],
+                "locations": job["locations"], "is_remote": job["is_remote"],
+                "employment_type": job["employment_type"], "apply_url": job["apply_url"],
+                "platform": job["platform"], "posted_at": job["posted_at"],
+                "scraped_at": job["scraped_at"], "score": round(score, 6),
+                "signals": {"text_similarity": round(float(lexical[idx]), 5),
+                            "lsa_similarity": round(float(semantic[idx]), 5),
+                            "location_match": loc_match, "confirmed_remote": job["is_remote"] is True},
             })
-        return sorted(output, key=lambda x: (-x["score"], x["id"]))[:k]
+        filtered.sort(key=lambda r: (-r["score"], r["job_key"]))
+        return filtered[:k]

@@ -1,36 +1,49 @@
+from pathlib import Path
+import sqlite3
+import tempfile
 from fastapi.testclient import TestClient
+
 from app import app
-from data import make_jobs, make_profiles
-from evaluate import evaluate
+from data import load_jobs, read_snapshot, upsert_jobs
 from recommender import JobRecommender
 
 
-def test_demo_fixture_counts():
-    assert len(make_jobs()) == 72
-    assert len(make_profiles()) == 18
+def test_real_snapshot_has_employer_urls_and_no_fake_descriptions():
+    jobs = read_snapshot()
+    assert len(jobs) > 100
+    assert all(job["apply_url"].startswith(("http://", "https://")) for job in jobs)
+    assert all("Sample Employer" not in job["company"] for job in jobs)
+    assert all("description" not in job and "skills" not in job for job in jobs)
 
 
-def test_api_health_and_recommendations():
-    client = TestClient(app)
-    assert client.get('/health').json()['job_count'] == 72
-    response = client.post('/recommend?k=5', json={
-        'query': 'Python backend and API development',
-        'skills': ['python', 'fastapi', 'sql'],
-        'location': 'Bengaluru', 'remote_ok': True, 'level': 'Internship'
-    })
-    assert response.status_code == 200
-    assert response.json()['count'] == 5
-    assert 'explanation' in response.json()['recommendations'][0]
+def test_sqlite_ingestion_is_idempotent(tmp_path):
+    p = tmp_path / "jobs.sqlite"
+    jobs = read_snapshot()
+    upsert_jobs(jobs, p)
+    upsert_jobs(jobs, p)
+    with sqlite3.connect(p) as conn:
+        assert conn.execute("SELECT COUNT(*) FROM jobs").fetchone()[0] == len(jobs)
+    assert len(load_jobs(p)) == len(jobs)
 
 
-def test_ranking_is_deterministic():
-    engine = JobRecommender(make_jobs())
-    profile = make_profiles()[0]
-    assert engine.recommend(profile) == engine.recommend(profile)
+def test_recommendations_have_real_source_urls():
+    engine = JobRecommender(read_snapshot())
+    ranked = engine.recommend({"query": "software engineer", "location": "Bengaluru"}, k=5)
+    assert len(ranked) == 5
+    assert all(r["apply_url"].startswith("https://") for r in ranked)
 
 
-def test_benchmark_outputs_metrics():
-    data = evaluate()
-    assert 0 <= data['hybrid']['NDCG@10'] <= 1
-    assert 0 <= data['hybrid']['Recall@10'] <= 1
-    assert 0 <= data['hybrid']['MRR@10'] <= 1
+def test_remote_filter_uses_confirmed_remote_only():
+    engine = JobRecommender(read_snapshot())
+    ranked = engine.recommend({"query": "engineer", "remote_only": True}, k=10)
+    assert all(r["is_remote"] is True for r in ranked)
+
+
+def test_api():
+    with TestClient(app) as client:
+        health = client.get("/health")
+        assert health.status_code == 200
+        assert health.json()["job_count"] > 100
+        res = client.post("/recommend?k=3", json={"query": "software engineering internship"})
+        assert res.status_code == 200
+        assert res.json()["count"] == 3

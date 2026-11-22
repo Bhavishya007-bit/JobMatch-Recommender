@@ -1,10 +1,27 @@
-# JobMatch — Personalized Job Recommendations (Prototype)
+# JobMatch — Real Job Listings Recommender
 
-A **working, offline demonstration** of an SDE/AI internship-relevant job recommendation API. Includes synthetic listings, a SQLite database, TF-IDF and low-rank latent semantic analysis (LSA) retrieval, skill-aware and location-aware re-ranking, explanations, and a repeatable offline evaluation using **NDCG@10, Recall@10, and MRR@10**.
+A Python/FastAPI search and ranking prototype built on **genuine job listings from employer applicant-tracking systems**. Unlike the initial synthetic proof-of-concept, the current version stores and ranks real company names, actual job titles, locations and application URLs. This is a portfolio prototype, not a production job board.
 
-**Data transparency:** All 72 jobs, 18 example candidate profiles, company names, and relevance labels are **synthetic**. Benchmark scores only describe this toy benchmark—not production job relevance, real recruiters, or live users. This is a prototype, not a deployed product or a transformer-embedding system.
+## Source and provenance
 
-## Run locally
+- Public upstream: [ConorsCode/open-jobs-data](https://github.com/ConorsCode/open-jobs-data)
+- Direct jobs snapshot: [data/recent_jobs.json](data/recent_jobs.json)
+- Provenance: [data/provenance.json](data/provenance.json)
+- The committed snapshot contains **1,326 genuine job listings from 147 companies**, scraped on November 21, 2026, with **1,326 application URLs**.
+- Daily incremental source: `data/new-jobs.json`, not the upstream complete active job index. Listings can expire, and source URLs do not guarantee an opening remains available.
+- Original source offers a separate larger `data/jobs.json` index. Refresh currently ingests the *new jobs* incremental feed and accumulates records by `platform:jobId` over time.
+- Most source records **do not contain detailed job descriptions, skill requirements, salary, or independently annotated relevance judgments**. The app does not fabricate them.
+
+## How it works
+
+1. `data.py` reads actual raw employer-ATS records from the included dated snapshot, validates them, and **upserts** them into SQLite with stable `platform:jobId` keys.
+2. `recommender.py` indexes the *provided* title/department/company text using TF-IDF, adds low-rank LSA retrieval (TruncatedSVD), and supports confirmed-remote and internship filters. An optional location preference influences ranking.
+3. `app.py` exposes `/health`, `/jobs`, `/recommend`, and an opt-in `/refresh` endpoint that fetches current incremental data (network required).
+4. `evaluate.py` records descriptive dataset coverage and an **exact-title retrieval sanity check**. This is not a real recommendation accuracy measurement.
+
+## Quick start
+
+Requires Python 3.10+.
 
 ```bash
 python -m pip install -r requirements.txt
@@ -13,28 +30,36 @@ pytest -q
 uvicorn app:app --reload
 ```
 
-Open http://127.0.0.1:8000/docs for the interactive API documentation.
+Interactive docs: http://127.0.0.1:8000/docs
 
-## Example API request
+Example query:
 
 ```bash
 curl -X POST 'http://127.0.0.1:8000/recommend?k=5' \
-  -H 'Content-Type: application/json' \
-  -d '{"query":"AI agent engineering internship with Python, retrieval and LLM evaluation", "skills":["python","fastapi","rag","embeddings","sql"], "location":"Bengaluru", "remote_ok":true, "level":"Internship"}'
+-H 'Content-Type: application/json' \
+-d '{"query":"Python software engineer internship","location":"Bengaluru","remote_ok":true,"internship_only":true}'
 ```
 
-## Design
+Refresh from upstream:
 
-1. `data.py`: Create **72 synthetic job records** across nine job families, and **18 synthetic example candidates**.
-2. `recommender.py`: Persist jobs to an actual **SQLite** table. Fit TF-IDF and `TruncatedSVD` to produce **35-dimensional LSA vectors**, ranking with a weighted combination of LSA similarity, skill overlap, location preference, and level compatibility. Compare with a TF-IDF-only baseline.
-3. `app.py`: Expose `/health`, `/jobs`, and `/recommend` via **FastAPI**; return personalized ranking and matching explanations.
-4. `evaluate.py`: Evaluate offline using graded synthetic relevance judgments and **NDCG@10, Recall@10, MRR@10**, plus median query-ranking latency. Output to `benchmark.json`.
-5. `tests/`: Smoke tests for API, seed count, ranking determinism, and benchmark bounds.
+```bash
+python data.py --refresh
+```
 
-## Evaluation caveats
+The refresh command **requires internet access** and fails clearly if upstream is unavailable. The included real snapshot lets the project run offline. To avoid abusive upstream requests, refresh no more than necessary (e.g., once daily). Old jobs remain stored; current code does not yet expire removed positions.
 
-The benchmark reuses the same job-family vocabulary across synthetic descriptions and candidates; metrics are **optimistic** and are not evidence of generalization. Timing is local, includes Python ranking but excludes network, model loading, and concurrent load. The next credible step is an external dataset with human annotations, plus actual transformer embeddings, retraining and data-refresh logic, user feedback, held-out evaluation, and deployment/observability.
+## Evaluation ethics
 
-## Using this project in a resume
+The prior synthetic NDCG@10 result is **retired**: it did not measure real-world recommendation quality. We do not report NDCG, MRR or Recall on the real dataset because it lacks independent user-to-job relevance labels. Known-title retrieval is merely a diagnostic for indexing, and should **not** be described as model accuracy.
 
-Use only after you have run and inspected the project, modified or maintained it, and can explain the indexing and ranking/evaluation choices. Describe its scores as **synthetic offline benchmarks**. Do not claim real-world adoption, deployment, production metrics, or that it uses LLM agents.
+## Limitations and production TODOs
+
+- Add actual descriptions from legally accessible sources to support skills and deeper semantics.
+- Create a human-reviewed relevance dataset and run NDCG@10, Recall@10 and MRR@10 against graded labels.
+- Add expiration/removal detection and a scheduled daily ingestion process.
+- Authenticate the `/refresh` endpoint, add request limits, retries and monitoring before any public deployment.
+- LSA is *not* a transformer-embedding model, and this prototype does not contain an autonomous LLM agent, durable personalization, or production traffic.
+
+## License and third-party data
+
+Consult upstream source policies before redistributing a commercial derivative. No rights are claimed to the job listings or company names.
