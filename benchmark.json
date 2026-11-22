@@ -1,12 +1,22 @@
 {
-  "dataset": "Real employer ATS postings from ConorsCode/open-jobs-data",
-  "snapshot_date": "2026-11-21",
-  "job_count": 1326,
-  "unique_employers": 147,
-  "confirmed_remote": 157,
-  "unknown_remote_status": 1083,
-  "valid_application_links": 1326,
-  "ranking_metrics": null,
-  "ranking_metrics_status": "Not available: independent user-to-job relevance labels are required for real NDCG@10, Recall@10 and MRR@10.",
-  "note": "Run python evaluate.py for current dataset coverage and indexing sanity checks. Historical synthetic NDCG claims do not apply to this dataset."
+  "summary": {
+    "dataset": "real employer ATS new-jobs incremental snapshot",
+    "jobs_in_database": 1326,
+    "distinct_employers": 147,
+    "confirmed_remote_jobs": 157,
+    "remote_status_unknown": 1083,
+    "jobs_with_apply_urls": 1326,
+    "source": "https://github.com/ConorsCode/open-jobs-data",
+    "note": "This is not a relevance benchmark. Actual NDCG@10 requires independent, graded relevance labels."
+  },
+  "sanity_checks": {
+    "baseline": {
+      "known_title_hit_at_10": 0.7,
+      "queries": 30
+    },
+    "hybrid": {
+      "known_title_hit_at_10": 0.7,
+      "queries": 30
+    }
+  }
 }
