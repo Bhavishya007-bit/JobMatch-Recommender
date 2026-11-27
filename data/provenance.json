@@ -2,8 +2,8 @@
   "source": "ConorsCode/open-jobs-data",
   "sourceRepository": "https://github.com/ConorsCode/open-jobs-data",
   "sourceFile": "data/new-jobs.json",
-  "refreshedAt": "2026-11-26T12:54:20.486391+00:00",
-  "validJobs": 1646,
-  "distinctCompanies": 172,
+  "refreshedAt": "2026-11-27T12:50:05.113824+00:00",
+  "validJobs": 1363,
+  "distinctCompanies": 146,
   "note": "Real incremental employer ATS postings, not all active jobs. Apply links can expire."
 }
